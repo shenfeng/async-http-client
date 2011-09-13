@@ -1,0 +1,8 @@
+pom.xml
+.classpath
+.project
+/bin
+*jar
+/lib/
+/classes/
+.lein-deps-sum
