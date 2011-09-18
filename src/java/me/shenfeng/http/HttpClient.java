@@ -1,9 +1,9 @@
 package me.shenfeng.http;
 
 import static java.util.concurrent.Executors.newCachedThreadPool;
-import static me.shenfeng.dns.DnsResponseFuture.RESOLVE_FAIL;
-import static me.shenfeng.http.Utils.getPath;
-import static me.shenfeng.http.Utils.getPort;
+import static me.shenfeng.Utils.getPath;
+import static me.shenfeng.Utils.getPort;
+import static me.shenfeng.dns.DnsClientConstant.*;
 import static org.jboss.netty.channel.Channels.pipeline;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.ACCEPT;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.ACCEPT_ENCODING;
@@ -20,11 +20,11 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import me.shenfeng.ListenableFuture;
-import me.shenfeng.ListenableFuture.Listener;
 import me.shenfeng.PrefixThreadFactory;
 import me.shenfeng.dns.DnsClient;
+import me.shenfeng.dns.DnsResponseFuture;
 
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -40,35 +40,18 @@ import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.DefaultHttpRequest;
-import org.jboss.netty.handler.codec.http.DefaultHttpResponse;
 import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
 import org.jboss.netty.handler.codec.http.HttpContentDecompressor;
 import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
-import org.jboss.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HttpClient {
+public class HttpClient implements HttpClientConstant {
 
-    public final static HttpResponse ABORT = new DefaultHttpResponse(
-            HTTP_1_1, new HttpResponseStatus(471, "client abort"));
-    public final static HttpResponse TOO_LARGE = new DefaultHttpResponse(
-            HTTP_1_1, new HttpResponseStatus(513, "body too large"));
-    public final static HttpResponse TIMEOUT = new DefaultHttpResponse(
-            HTTP_1_1, new HttpResponseStatus(520, "server timeout"));
-    public final static HttpResponse CONNECTION_ERROR = new DefaultHttpResponse(
-            HTTP_1_1, new HttpResponseStatus(170, "connecton error"));
-    public final static HttpResponse CONNECTION_TIMEOUT = new DefaultHttpResponse(
-            HTTP_1_1, new HttpResponseStatus(172, "connecton timeout"));
-    public final static HttpResponse CONNECTION_RESET = new DefaultHttpResponse(
-            HTTP_1_1, new HttpResponseStatus(175, "connecton reset"));
-    public final static HttpResponse UNKOWN_HOST = new DefaultHttpResponse(
-            HTTP_1_1, new HttpResponseStatus(171, "unknow host"));
-    public final static HttpResponse UNKOWN_ERROR = new DefaultHttpResponse(
-            HTTP_1_1, new HttpResponseStatus(180, "unknow error"));
+    static final Logger logger = LoggerFactory.getLogger(HttpClient.class);
 
     private final ClientBootstrap mBootstrap;
     private final ChannelGroup mAllChannels;
@@ -96,71 +79,94 @@ public class HttpClient {
         mBootstrap.setPipelineFactory(new HttpClientPipelineFactory());
         mBootstrap.setOption("connectTimeoutMillis",
                 conf.connectionTimeOutInMs);
+        mBootstrap.setOption("receiveBufferSize", conf.receiveBuffer);
+        mBootstrap.setOption("sendBufferSize", conf.sendBuffer);
         mBootstrap.setOption("reuseAddress", true);
         mAllChannels = new DefaultChannelGroup("client");
     }
 
     public void close() {
         mAllChannels.close().awaitUninterruptibly();
+        mDns.close();
         mBootstrap.releaseExternalResources();
+    }
+
+    private void sendRequest(URI uri, String ip, HttpResponseFuture resp,
+            Map<String, Object> headers) {
+        final HttpRequest request = new DefaultHttpRequest(HTTP_1_1, GET,
+                getPath(uri));
+        request.setHeader(HOST, uri.getHost());
+        request.setHeader(USER_AGENT, mConf.userAgent);
+        request.setHeader(ACCEPT, "*/*");
+        request.setHeader(ACCEPT_ENCODING, "gzip, deflate");
+        request.setHeader(CONNECTION, CLOSE);
+
+        for (Map.Entry<String, Object> entry : headers.entrySet()) {
+            request.addHeader(entry.getKey(), entry.getValue());
+        }
+        ChannelFuture cf = mBootstrap.connect(new InetSocketAddress(ip,
+                getPort(uri)));
+        Channel ch = cf.getChannel();
+        resp.setChannel(ch);
+        mAllChannels.add(ch);
+        ch.getPipeline().getContext(Decoder.class).setAttachment(resp);
+        cf.addListener(new ConnectionListener(request, resp, uri));
     }
 
     public HttpResponseFuture execGet(final URI uri,
             final Map<String, Object> headers) {
         final String host = uri.getHost();
-        final HttpResponseFuture future = new HttpResponseFuture(
+        final HttpResponseFuture resp = new HttpResponseFuture(
                 mConf.requestTimeoutInMs, uri);
+        final DnsResponseFuture dns = mDns.resolve(host);
+        final AtomicInteger retry = new AtomicInteger(2); // retry 2 times
+        final Runnable listener = new Runnable() {
+            public void run() {
+                String ip = null;
+                try {
+                    ip = dns.get(); // can not fail
+                } catch (Exception e) {
+                }
 
-        mDns.resolve(host).addistener(new Listener<String>() {
-            public void run(ListenableFuture<String> l, String result) {
-                if (RESOLVE_FAIL.equals(result)) {
-                    future.done(UNKOWN_HOST);
-                } else {
-                    final HttpRequest request = new DefaultHttpRequest(
-                            HTTP_1_1, GET, getPath(uri));
-                    request.setHeader(HOST, host);
-                    request.setHeader(USER_AGENT, mConf.userAgent);
-                    request.setHeader(ACCEPT, "*/*");
-                    request.setHeader(ACCEPT_ENCODING, "gzip, deflate");
-                    request.setHeader(CONNECTION, CLOSE);
-
-                    for (Map.Entry<String, Object> entry : headers.entrySet()) {
-                        request.addHeader(entry.getKey(), entry.getValue());
+                if (DNS_UNKOWN_HOST.equals(ip)) {
+                    resp.done(UNKOWN_HOST);
+                } else if (DNS_TIMEOUT.equals(ip)) {
+                    if (retry.decrementAndGet() <= 0) {
+                        resp.done(UNKOWN_HOST);
+                    } else {
+                        logger.trace("resolve {} timeout, retry {}", host,
+                                retry.get());
+                        resp.touch();
+                        mDns.resolve(host).addListener(this);
                     }
-                    ChannelFuture cf = mBootstrap
-                            .connect(new InetSocketAddress(result,
-                                    getPort(uri)));
-                    Channel ch = cf.getChannel();
-                    future.setChannel(ch);
-                    mAllChannels.add(ch);
-                    future.touch();
-                    ch.getPipeline().getContext(Decoder.class)
-                            .setAttachment(future);
-                    cf.addListener(new ConnectionListener(request, future,
-                            uri));
+                } else {
+                    sendRequest(uri, ip, resp, headers);
+                    resp.touch();
                 }
             }
-        });
-        return future;
+        };
+        dns.addListener(listener);
+        return resp;
     }
 }
 
 class HttpClientPipelineFactory implements ChannelPipelineFactory {
 
-    public ChannelPipeline getPipeline() throws Exception {
+    private final static HttpContentDecompressor inflater = new HttpContentDecompressor();
+    private final static ResponseHandler handler = new ResponseHandler();
 
+    public ChannelPipeline getPipeline() throws Exception {
         ChannelPipeline pipeline = pipeline();
         pipeline.addLast("decoder", new Decoder());
         pipeline.addLast("encoder", new HttpRequestEncoder());
-        pipeline.addLast("inflater", new HttpContentDecompressor());
+        pipeline.addLast("inflater", inflater);
         pipeline.addLast("aggregator", new HttpChunkAggregator(1048576));
-        pipeline.addLast("handler", new ResponseHandler());
+        pipeline.addLast("handler", handler);
         return pipeline;
     }
 }
 
 class Decoder extends HttpResponseDecoder {
-    @Override
     protected Object decode(ChannelHandlerContext ctx, Channel channel,
             ChannelBuffer buffer, State state) throws Exception {
         HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
@@ -176,17 +182,14 @@ class ResponseHandler extends SimpleChannelUpstreamHandler {
     private static Logger logger = LoggerFactory
             .getLogger(ResponseHandler.class);
 
-    @Override
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)
             throws Exception {
         HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
-
         HttpResponse response = (HttpResponse) e.getMessage();
         ctx.getChannel().close();
         future.done(response);
     }
 
-    @Override
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
             throws Exception {
         ctx.getChannel().close();
@@ -196,7 +199,7 @@ class ResponseHandler extends SimpleChannelUpstreamHandler {
             logger.trace(future.mUri.toString(), cause);
             future.abort(cause);
         } else {
-            logger.trace("exceptionCaught", e);
+            logger.trace(cause.getMessage(), cause);
         }
     }
 }

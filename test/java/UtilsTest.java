@@ -4,7 +4,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 
-import me.shenfeng.http.Utils;
+import me.shenfeng.Utils;
 
 import org.junit.Assert;
 import org.junit.Test;

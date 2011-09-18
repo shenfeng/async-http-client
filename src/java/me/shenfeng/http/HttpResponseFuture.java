@@ -2,39 +2,28 @@ package me.shenfeng.http;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static me.shenfeng.http.HttpClient.CONNECTION_ERROR;
-import static me.shenfeng.http.HttpClient.CONNECTION_RESET;
-import static me.shenfeng.http.HttpClient.CONNECTION_TIMEOUT;
-import static me.shenfeng.http.HttpClient.TIMEOUT;
-import static me.shenfeng.http.HttpClient.TOO_LARGE;
-import static me.shenfeng.http.HttpClient.UNKOWN_ERROR;
+import static me.shenfeng.http.HttpClientConstant.CONNECTION_ERROR;
+import static me.shenfeng.http.HttpClientConstant.CONNECTION_RESET;
+import static me.shenfeng.http.HttpClientConstant.CONNECTION_TIMEOUT;
+import static me.shenfeng.http.HttpClientConstant.TIMEOUT;
+import static me.shenfeng.http.HttpClientConstant.TOO_LARGE;
+import static me.shenfeng.http.HttpClientConstant.UNKOWN_ERROR;
 
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 
-import me.shenfeng.ListenableFuture;
+import me.shenfeng.AbstractResponseFuture;
 
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.handler.codec.frame.TooLongFrameException;
 import org.jboss.netty.handler.codec.http.HttpResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class HttpResponseFuture implements ListenableFuture<HttpResponse> {
-    private final static Logger logger = LoggerFactory
-            .getLogger(HttpResponseFuture.class);
+public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
 
-    private final CountDownLatch mLatch = new CountDownLatch(1);
-    private final AtomicReference<HttpResponse> mResponse = new AtomicReference<HttpResponse>();
-    private final ArrayList<Listener<HttpResponse>> mListeners = new ArrayList<Listener<HttpResponse>>(
-            1);
     private Object mAttachment;
     private Channel mChannel;
     private long mTouchTime;
@@ -47,12 +36,18 @@ public class HttpResponseFuture implements ListenableFuture<HttpResponse> {
         mTouchTime = currentTimeMillis();
     }
 
-    public void checkTimeout(Runnable pre) {
+    public boolean isTimeout() {
         if (mTimeout + mTouchTime - currentTimeMillis() < 0) {
-            if (pre != null)
-                pre.run();
-            done(TIMEOUT);
+            return done(TIMEOUT);
         }
+        return false;
+    }
+
+    @Override
+    public boolean done(HttpResponse result) {
+        if (mChannel != null)
+            mChannel.close();
+        return super.done(result);
     }
 
     public void setAttachment(Object att) {
@@ -63,7 +58,7 @@ public class HttpResponseFuture implements ListenableFuture<HttpResponse> {
         return mAttachment;
     }
 
-    public void abort(Throwable t) {
+    public boolean abort(Throwable t) {
         HttpResponse resp = UNKOWN_ERROR;
         if (t instanceof TooLongFrameException) {
             resp = TOO_LARGE;
@@ -76,37 +71,7 @@ public class HttpResponseFuture implements ListenableFuture<HttpResponse> {
                 && t.getMessage().indexOf("reset") != -1) {
             resp = CONNECTION_RESET;
         }
-        done(resp);
-    }
-
-    @Override
-    public ListenableFuture<HttpResponse> addistener(
-            Listener<HttpResponse> listener) {
-        if (mLatch.getCount() == 0) {
-            listener.run(this, mResponse.get());
-        } else {
-            mListeners.add(listener);
-        }
-        return this;
-    }
-
-    public boolean cancel(boolean mayInterruptIfRunning) {
-        return false;
-    }
-
-    public void done(HttpResponse response) {
-        if (mResponse.compareAndSet(null, response)) {
-            mLatch.countDown();
-            if (mChannel != null)
-                mChannel.close();// in all condition, it's need to be closed
-            for (Listener<HttpResponse> listener : mListeners) {
-                try {
-                    listener.run(this, response);
-                } catch (Exception e) {
-                    logger.error(e.getMessage(), e);
-                }
-            }
-        }
+        return done(resp);
     }
 
     public HttpResponse get() throws InterruptedException, ExecutionException {
@@ -127,15 +92,7 @@ public class HttpResponseFuture implements ListenableFuture<HttpResponse> {
             wait = time + mTouchTime - System.currentTimeMillis();
         }
         done(TIMEOUT);
-        return mResponse.get();
-    }
-
-    public boolean isCancelled() {
-        return false;
-    }
-
-    public boolean isDone() {
-        return mResponse.get() == null;
+        return mResult.get();
     }
 
     public void setChannel(Channel ch) {

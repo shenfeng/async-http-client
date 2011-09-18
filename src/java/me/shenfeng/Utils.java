@@ -1,4 +1,4 @@
-package me.shenfeng.http;
+package me.shenfeng;
 
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
 import static org.jboss.netty.util.CharsetUtil.UTF_8;
@@ -24,7 +24,7 @@ public class Utils {
             b += 256;
         return b;
     }
-    
+
     public static boolean isIP(String host) {
         for (int i = 0; i < host.length(); ++i) {
             if (!(Character.isDigit(host.charAt(i)) || host.charAt(i) == '.')) {
@@ -73,4 +73,5 @@ public class Utils {
         return new String(buffer.array(), 0, buffer.readableBytes(),
                 parseCharset(type));
     }
+
 }

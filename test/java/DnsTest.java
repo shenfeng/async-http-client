@@ -1,9 +1,9 @@
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-import me.shenfeng.ListenableFuture;
-import me.shenfeng.ListenableFuture.Listener;
 import me.shenfeng.dns.DnsClient;
 import me.shenfeng.dns.DnsResponseFuture;
 
@@ -39,18 +39,25 @@ public class DnsTest {
     @Test
     public void testHomeMadeDnsResolver() throws InterruptedException,
             ExecutionException {
-        final DnsResponseFuture f = client.resolve("shenfeng.me");
-        f.addistener(new Listener<String>() {
-            @Override
-            public void run(ListenableFuture<String> f, String result) {
-                try {
-                    System.out.println("aaa\t" + result);
-                } catch (Exception e) {
-                    e.printStackTrace();
+        String[] hosts = new String[] { "shenfeng.me", "onycloud.com",
+                "trakrapp.com", "rssminer.net" };
+        List<DnsResponseFuture> list = new ArrayList<DnsResponseFuture>();
+        for (String host : hosts) {
+            final DnsResponseFuture f = client.resolve(host);
+            f.addListener(new Runnable() {
+                public void run() {
+                    try {
+                        System.out.println("aaa\t" + f.get());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
-            }
-        });
-        String ip = f.get();
-        System.out.println(ip);
+            });
+            list.add(f);
+            // System.out.println(ip);
+        }
+        for (DnsResponseFuture f : list) {
+            f.get();
+        }
     }
 }
