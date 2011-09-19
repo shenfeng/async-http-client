@@ -16,7 +16,11 @@ public class Utils {
     }
 
     public static int toInt(byte[] bytes) {
-        return (toInt(bytes[0]) << 8) + toInt(bytes[1]);
+        return toInt(bytes, 0);
+    }
+
+    public static int toInt(byte[] bytes, int start) {
+        return (toInt(bytes[start]) << 8) + toInt(bytes[start + 1]);
     }
 
     public static int toInt(int b) {

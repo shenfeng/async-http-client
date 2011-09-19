@@ -37,6 +37,14 @@ public class DnsTest {
     }
 
     @Test
+    public void testCname() throws InterruptedException, ExecutionException {
+        DnsResponseFuture future = client.resolve("www.ogidc.com");
+        String ip = future.get();
+
+        System.out.println(ip);// 112.126.149.103
+    }
+
+    @Test
     public void testHomeMadeDnsResolver() throws InterruptedException,
             ExecutionException {
         String[] hosts = new String[] { "shenfeng.me", "onycloud.com",

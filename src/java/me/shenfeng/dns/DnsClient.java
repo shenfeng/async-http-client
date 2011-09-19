@@ -36,7 +36,7 @@ public class DnsClient implements DnsClientConstant {
 
     private final ConnectionlessBootstrap mBootstrap;
     private final InetSocketAddress mDnsServer = new InetSocketAddress(
-            "61.147.37.1", 53);
+            "8.8.4.4", 53);
     private final DatagramChannel c;
     private final Thread mTimeoutThread;
     private final ConcurrentHashMap<Pair, DnsResponseFuture> mContext = new ConcurrentHashMap<Pair, DnsResponseFuture>();
@@ -165,16 +165,28 @@ class DnsResponseHandler extends SimpleChannelHandler {
 
         final DnsResponseFuture future = mContext.get(new Pair(host, id));
         if (future != null) {
-            if (answers > 0) {
-                start += 12;// skip answers name, type, class, ttl, data length
-                StringBuilder sb = new StringBuilder(15);
-                for (int i = 0; i < 4; ++i) {
-                    int b = toInt(array[start + i]);
-                    sb.append(b).append('.');
+            int type, datalength;
+            for (int i = 0; i < answers; ++i) {
+                start += 2;// skip name
+                type = toInt(array, start);
+                start += 8; // skip type, class, ttl
+                datalength = toInt(array, start);
+
+                start += 2; // skip data length
+                if (type == 1) { // A
+                    StringBuilder sb = new StringBuilder(15);
+                    for (int j = 0; j < 4; ++j) {
+                        int b = toInt(array[start + j]);
+                        sb.append(b).append('.');
+                    }
+                    String ip = sb.subSequence(0, sb.length() - 1).toString();
+                    future.done(ip);
+                    break;
                 }
-                String ip = sb.subSequence(0, sb.length() - 1).toString();
-                future.done(ip);
-            } else {
+                start += datalength;
+            }
+
+            if (answers == 0) {
                 future.done(DNS_UNKOWN_HOST);
             }
         }

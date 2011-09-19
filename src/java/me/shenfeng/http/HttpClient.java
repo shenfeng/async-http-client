@@ -119,7 +119,7 @@ public class HttpClient implements HttpClientConstant {
         final HttpResponseFuture resp = new HttpResponseFuture(
                 mConf.requestTimeoutInMs, uri);
         final DnsResponseFuture dns = mDns.resolve(host);
-        final AtomicInteger retry = new AtomicInteger(2); // retry 2 times
+        final AtomicInteger retry = new AtomicInteger(3); // retry 2 times
         final Runnable listener = new Runnable() {
             public void run() {
                 String ip = null;
