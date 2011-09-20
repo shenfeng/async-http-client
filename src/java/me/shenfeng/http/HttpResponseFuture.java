@@ -24,9 +24,9 @@ import org.jboss.netty.handler.codec.http.HttpResponse;
 
 public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
 
-    private Object mAttachment;
-    private Channel mChannel;
-    private long mTouchTime;
+    private volatile Object mAttachment;
+    private volatile Channel mChannel;
+    private volatile long mTouchTime;
     private final int mTimeout;
     final URI uri;// package private
 
@@ -43,7 +43,6 @@ public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
         return false;
     }
 
-    @Override
     public boolean done(HttpResponse result) {
         if (mChannel != null)
             mChannel.close();
