@@ -11,6 +11,7 @@ import static org.jboss.netty.util.ThreadRenamingRunnable.setThreadNameDetermine
 
 import java.net.InetSocketAddress;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,6 +19,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 
 import me.shenfeng.PrefixThreadFactory;
+import me.shenfeng.Utils;
 
 import org.jboss.netty.bootstrap.ConnectionlessBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -34,8 +36,7 @@ public class DnsClient implements DnsClientConstant {
     final static Random r = new Random();
 
     private final ConnectionlessBootstrap mBootstrap;
-    private final InetSocketAddress mDnsServer = new InetSocketAddress(
-            "8.8.8.8", 53);
+    private final InetSocketAddress[] mDnsServers;
     private final DatagramChannel c;
     private Thread mTimeoutThread;
     private final DnsClientConfig mConf;
@@ -69,6 +70,14 @@ public class DnsClient implements DnsClientConstant {
     }
 
     public DnsClient(DnsClientConfig conf) {
+        List servers = Utils.getNameServer();
+        mDnsServers = new InetSocketAddress[servers.size()];
+
+        for (int i = 0; i < servers.size(); ++i) {
+            mDnsServers[i] = new InetSocketAddress(servers.get(i).toString(),
+                    53);
+        }
+
         mConf = conf;
         setThreadNameDeterminer(CURRENT);
         ExecutorService executor = newCachedThreadPool(new PrefixThreadFactory(
@@ -90,7 +99,7 @@ public class DnsClient implements DnsClientConstant {
         } else {
             final int id = r.nextInt(65536);
             final ChannelBuffer buffer = encodeDnsRequest(id, host);
-            c.write(buffer, mDnsServer);
+            c.write(buffer, mDnsServers[id % mDnsServers.length]);
             mContext.put(new Pair(host, id), future);
         }
         return future;

@@ -9,6 +9,7 @@ import static org.jboss.netty.util.CharsetUtil.UTF_8;
 
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.util.List;
 
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.handler.codec.compression.ZlibDecoder;
@@ -45,7 +46,6 @@ public class Utils {
     }
 
     private static final String CS = "charset=";
-    private static final String CT = "Content-Type";
     private static final char Q = '"';
 
     public static String getPath(URI uri) {
@@ -57,6 +57,10 @@ public class Utils {
             return path;
         else
             return path + "?" + query;
+    }
+
+    public static List getNameServer() {
+        return sun.net.dns.ResolverConfiguration.open().nameservers();
     }
 
     public static int getPort(URI uri) {
@@ -92,9 +96,9 @@ public class Utils {
             byte[] array = buffer.array();
             int length = Math.min(350, array.length);
             String s = new String(array, 0, length, UTF_8);
-            int idx = s.indexOf(CT);
+            int idx = s.indexOf(CONTENT_TYPE);
             if (idx != -1) {
-                int start = s.indexOf(Q, idx + CT.length() + 2);
+                int start = s.indexOf(Q, idx + CONTENT_TYPE.length() + 2);
                 if (start != -1) {
                     start += 1;
                     int end = s.indexOf(Q, start);
@@ -139,5 +143,4 @@ public class Utils {
             ch = UTF_8;
         return new String(buffer.array(), 0, buffer.readableBytes(), ch);
     }
-
 }
