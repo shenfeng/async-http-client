@@ -36,7 +36,6 @@ import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
-import org.jboss.netty.handler.codec.http.HttpContentDecompressor;
 import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
@@ -174,7 +173,6 @@ class HttpClientPipelineFactory implements ChannelPipelineFactory {
         ChannelPipeline pipeline = pipeline();
         pipeline.addLast("decoder", new Decoder());
         pipeline.addLast("encoder", new HttpRequestEncoder());
-        pipeline.addLast("inflater", new HttpContentDecompressor());
         pipeline.addLast("aggregator", new HttpChunkAggregator(1048576));
         pipeline.addLast("handler", new ResponseHandler());
         return pipeline;

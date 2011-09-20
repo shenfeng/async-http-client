@@ -35,7 +35,7 @@ public class DnsClient implements DnsClientConstant {
 
     private final ConnectionlessBootstrap mBootstrap;
     private final InetSocketAddress mDnsServer = new InetSocketAddress(
-            "8.8.4.4", 53);
+            "8.8.8.8", 53);
     private final DatagramChannel c;
     private Thread mTimeoutThread;
     private final DnsClientConfig mConf;
