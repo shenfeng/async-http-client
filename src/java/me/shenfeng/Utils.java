@@ -3,6 +3,7 @@ package me.shenfeng;
 import static org.jboss.netty.buffer.ChannelBuffers.wrappedBuffer;
 import static org.jboss.netty.handler.codec.compression.ZlibWrapper.GZIP;
 import static org.jboss.netty.handler.codec.compression.ZlibWrapper.ZLIB_OR_NONE;
+import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_ENCODING;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
 import static org.jboss.netty.util.CharsetUtil.UTF_8;
 
@@ -12,7 +13,6 @@ import java.nio.charset.Charset;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.handler.codec.compression.ZlibDecoder;
 import org.jboss.netty.handler.codec.embedder.DecoderEmbedder;
-import org.jboss.netty.handler.codec.http.HttpHeaders.Names;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 
 public class Utils {
@@ -45,6 +45,8 @@ public class Utils {
     }
 
     private static final String CS = "charset=";
+    private static final String CT = "Content-Type";
+    private static final char Q = '"';
 
     public static String getPath(URI uri) {
         String path = uri.getPath();
@@ -67,22 +69,46 @@ public class Utils {
 
     public static Charset parseCharset(String type) {
         try {
-            if (type != null) {
-                type = type.toLowerCase();
-                int i = type.indexOf(CS);
-                if (i != -1) {
-                    String charset = type.substring(i + CS.length()).trim();
-                    return Charset.forName(charset);
-                }
+            type = type.toLowerCase();
+            int i = type.indexOf(CS);
+            if (i != -1) {
+                String charset = type.substring(i + CS.length()).trim();
+                return Charset.forName(charset);
             }
         } catch (Exception ignore) {
         }
-        return UTF_8;
+        return null;
+    }
+
+    static Charset detectCharset(HttpResponse resp) {
+        String type = resp.getHeader(CONTENT_TYPE);
+        Charset result = null;
+        if (type != null) {
+            result = parseCharset(type);
+        }
+        if (result == null) {
+            // decode a little the find Content-Type
+            ChannelBuffer buffer = resp.getContent();
+            byte[] array = buffer.array();
+            int length = Math.min(350, array.length);
+            String s = new String(array, 0, length, UTF_8);
+            int idx = s.indexOf(CT);
+            if (idx != -1) {
+                int start = s.indexOf(Q, idx + CT.length() + 2);
+                if (start != -1) {
+                    start += 1;
+                    int end = s.indexOf(Q, start);
+                    if (end != -1) {
+                        result = parseCharset(s.substring(start, end));
+                    }
+                }
+            }
+        }
+        return result;
     }
 
     public static String bodyString(HttpResponse m) {
-        String type = m.getHeader(CONTENT_TYPE);
-        String contentEncoding = m.getHeader(Names.CONTENT_ENCODING);
+        String contentEncoding = m.getHeader(CONTENT_ENCODING);
         DecoderEmbedder<ChannelBuffer> decoder = null;
         if ("gzip".equalsIgnoreCase(contentEncoding)
                 || "x-gzip".equalsIgnoreCase(contentEncoding)) {
@@ -107,9 +133,11 @@ public class Utils {
                 buffer = b;
             }
         }
-
-        return new String(buffer.array(), 0, buffer.readableBytes(),
-                parseCharset(type));
+        m.setContent(buffer);// for detect charset
+        Charset ch = detectCharset(m);
+        if (ch == null)
+            ch = UTF_8;
+        return new String(buffer.array(), 0, buffer.readableBytes(), ch);
     }
 
 }

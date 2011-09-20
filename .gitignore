@@ -1,8 +1,10 @@
 pom.xml
+target/
 .classpath
 .project
 /bin
 *jar
 /lib/
 /classes/
+.settings/
 .lein-deps-sum
