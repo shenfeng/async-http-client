@@ -1,6 +1,5 @@
 package me.shenfeng.dns;
 
-import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static me.shenfeng.Utils.isIP;
 import static me.shenfeng.Utils.toBytes;
@@ -38,10 +37,39 @@ public class DnsClient implements DnsClientConstant {
     private final InetSocketAddress mDnsServer = new InetSocketAddress(
             "8.8.4.4", 53);
     private final DatagramChannel c;
-    private final Thread mTimeoutThread;
+    private Thread mTimeoutThread;
+    private final DnsClientConfig mConf;
     private final ConcurrentHashMap<Pair, DnsResponseFuture> mContext = new ConcurrentHashMap<Pair, DnsResponseFuture>();
 
     public DnsClient() {
+        this(new DnsClientConfig());
+    }
+
+    private void startTimeoutThread() {
+        mTimeoutThread = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    while (c.isOpen()) {
+                        Thread.sleep(mConf.timerInterval);
+                        Iterator<Entry<Pair, DnsResponseFuture>> it = mContext
+                                .entrySet().iterator();
+                        while (it.hasNext()) {
+                            Entry<Pair, DnsResponseFuture> e = it.next();
+                            DnsResponseFuture r = e.getValue();
+                            if (r.isDone() || r.isTimeout()) {
+                                it.remove();
+                            }
+                        }
+                    }
+                } catch (InterruptedException ignore) {
+                }
+            }
+        }, TIMER_NAME);
+        mTimeoutThread.start();
+    }
+
+    public DnsClient(DnsClientConfig conf) {
+        mConf = conf;
         setThreadNameDeterminer(CURRENT);
         ExecutorService executor = newCachedThreadPool(new PrefixThreadFactory(
                 "DNS"));
@@ -50,38 +78,12 @@ public class DnsClient implements DnsClientConstant {
         mBootstrap = new ConnectionlessBootstrap(factory);
         mBootstrap.setPipelineFactory(new DnsClientPipelineFactory(mContext));
         c = (DatagramChannel) mBootstrap.bind(new InetSocketAddress(0));
-        mTimeoutThread = new Thread(new Runnable() {
-            public void run() {
-                long sleepTime = CHECK_INTERVAL;
-                long startTime = currentTimeMillis();
-                try {
-                    while (c.isOpen()) {
-                        while (sleepTime > 0) {
-                            Thread.sleep(sleepTime);
-                            sleepTime = CHECK_INTERVAL + startTime
-                                    - currentTimeMillis();
-                        }
-                        Iterator<Entry<Pair, DnsResponseFuture>> it = mContext
-                                .entrySet().iterator();
-                        while (it.hasNext()) {
-                            Entry<Pair, DnsResponseFuture> e = it.next();
-                            DnsResponseFuture future = e.getValue();
-                            if (future.isDone() || future.isTimeout()) {
-                                it.remove();
-                            }
-                        }
-                        sleepTime = CHECK_INTERVAL;
-                        startTime = currentTimeMillis();
-                    }
-                } catch (InterruptedException e) {
-                }
-            }
-        }, TIMER_NAME);
-        mTimeoutThread.start();
+        startTimeoutThread();
     }
 
     public DnsResponseFuture resolve(final String host) {
-        final DnsResponseFuture future = new DnsResponseFuture();
+        final DnsResponseFuture future = new DnsResponseFuture(
+                mConf.dnsTimeout);
         if (isIP(host)) {
             future.done(host);
             return future;
@@ -146,7 +148,6 @@ class DnsResponseHandler extends SimpleChannelHandler {
 
     public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)
             throws Exception {
-        // TODO cname www.ogidc.com
         ChannelBuffer o = ((ChannelBuffer) e.getMessage()).slice();
         byte[] array = o.array();
         final int id = toInt(array);
@@ -210,7 +211,6 @@ class Pair {
         return false;
     }
 
-    @Override
     public String toString() {
         return host + "@" + id;
     }

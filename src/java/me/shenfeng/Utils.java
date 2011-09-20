@@ -42,9 +42,13 @@ public class Utils {
 
     public static String getPath(URI uri) {
         String path = uri.getPath();
+        String query = uri.getRawQuery();
         if ("".equals(path))
             path = "/";
-        return path + "?" + uri.getRawQuery();
+        if (query == null)
+            return path;
+        else
+            return path + "?" + query;
     }
 
     public static int getPort(URI uri) {
@@ -65,8 +69,7 @@ public class Utils {
                     return Charset.forName(charset);
                 }
             }
-        } catch (Exception e) {
-            // ignore
+        } catch (Exception ignore) {
         }
         return UTF_8;
     }

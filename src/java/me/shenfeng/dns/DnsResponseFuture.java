@@ -4,7 +4,6 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static me.shenfeng.dns.DnsClientConstant.DNS_TIMEOUT;
 import static me.shenfeng.dns.DnsClientConstant.DNS_UNKOWN_HOST;
-import static me.shenfeng.dns.DnsClientConstant.TIMEOUT;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -15,14 +14,16 @@ import me.shenfeng.AbstractResponseFuture;
 public class DnsResponseFuture extends AbstractResponseFuture<String> {
 
     private final long mStartTime;
+    private final int mTimeout;
 
-    public DnsResponseFuture() {
+    public DnsResponseFuture(int timeout) {
+        mTimeout = timeout;
         mStartTime = currentTimeMillis();
     }
 
     public String get() throws InterruptedException, ExecutionException {
         try {
-            return get(TIMEOUT, MILLISECONDS);
+            return get(mTimeout, MILLISECONDS);
         } catch (TimeoutException e) {
             done(DNS_TIMEOUT);
             return DNS_TIMEOUT;
@@ -50,7 +51,7 @@ public class DnsResponseFuture extends AbstractResponseFuture<String> {
     }
 
     public boolean isTimeout() {
-        if (TIMEOUT + mStartTime - currentTimeMillis() < 0) {
+        if (mTimeout + mStartTime - currentTimeMillis() < 0) {
             return done(DNS_TIMEOUT);
         }
         return false;

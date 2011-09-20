@@ -28,11 +28,11 @@ public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
     private Channel mChannel;
     private long mTouchTime;
     private final int mTimeout;
-    final URI mUri;// package private
+    final URI uri;// package private
 
     public HttpResponseFuture(int timeout, URI uri) {
         mTimeout = timeout;
-        mUri = uri;
+        this.uri = uri;
         mTouchTime = currentTimeMillis();
     }
 
@@ -89,7 +89,7 @@ public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
         long wait = time + mTouchTime - currentTimeMillis();
         while (mLatch.getCount() > 0 && wait > 0) {
             mLatch.await(wait, MILLISECONDS);
-            wait = time + mTouchTime - System.currentTimeMillis();
+            wait = time + mTouchTime - currentTimeMillis();
         }
         done(TIMEOUT);
         return mResult.get();

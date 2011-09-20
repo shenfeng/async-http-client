@@ -24,4 +24,6 @@ public interface HttpClientConstant {
             new HttpResponseStatus(171, "unknow host"));
     final static HttpResponse UNKOWN_ERROR = new DefaultHttpResponse(
             HTTP_1_1, new HttpResponseStatus(180, "unknow error"));
+    
+    final static String TIMER_NAME="HTTP-timer";
 }
