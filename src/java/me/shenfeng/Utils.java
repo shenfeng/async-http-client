@@ -46,7 +46,6 @@ public class Utils {
     }
 
     private static final String CS = "charset=";
-    private static final char Q = '"';
 
     public static String getPath(URI uri) {
         String path = uri.getPath();
@@ -72,38 +71,34 @@ public class Utils {
     }
 
     public static Charset parseCharset(String type) {
-        try {
-            type = type.toLowerCase();
-            int i = type.indexOf(CS);
-            if (i != -1) {
-                String charset = type.substring(i + CS.length()).trim();
-                return Charset.forName(charset);
+        if (type != null) {
+            try {
+                type = type.toLowerCase();
+                int i = type.indexOf(CS);
+                if (i != -1) {
+                    String charset = type.substring(i + CS.length()).trim();
+                    return Charset.forName(charset);
+                }
+            } catch (Exception ignore) {
             }
-        } catch (Exception ignore) {
         }
         return null;
     }
 
     static Charset detectCharset(HttpResponse resp) {
-        String type = resp.getHeader(CONTENT_TYPE);
-        Charset result = null;
-        if (type != null) {
-            result = parseCharset(type);
-        }
+        Charset result = parseCharset(resp.getHeader(CONTENT_TYPE));
         if (result == null) {
-            // decode a little the find Content-Type
-            ChannelBuffer buffer = resp.getContent();
-            byte[] array = buffer.array();
-            int length = Math.min(350, array.length);
-            String s = new String(array, 0, length, UTF_8);
-            int idx = s.indexOf(CONTENT_TYPE);
+            // decode a little the find charset=???
+            byte[] arr = resp.getContent().array();
+            String s = new String(arr, 0, Math.min(350, arr.length), UTF_8);
+            int idx = s.indexOf(CS);
             if (idx != -1) {
-                int start = s.indexOf(Q, idx + CONTENT_TYPE.length() + 2);
-                if (start != -1) {
-                    start += 1;
-                    int end = s.indexOf(Q, start);
-                    if (end != -1) {
-                        result = parseCharset(s.substring(start, end));
+                int start = idx + CS.length();
+                int end = s.indexOf('"', start);
+                if (end != -1) {
+                    try {
+                        result = Charset.forName(s.substring(start, end));
+                    } catch (Exception ignore) {
                     }
                 }
             }
