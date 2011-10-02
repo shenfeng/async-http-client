@@ -9,6 +9,8 @@ import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.USER_AGENT;
 import static org.jboss.netty.handler.codec.http.HttpMethod.GET;
 import static org.jboss.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
+import java.net.Proxy;
+import java.net.Proxy.Type;
 import java.util.Map;
 
 import org.jboss.netty.channel.Channel;
@@ -24,14 +26,16 @@ public class ConnectionListener implements ChannelFutureListener {
     private static Logger logger = LoggerFactory
             .getLogger(ConnectionListener.class);
     private final HttpClientConfig mConf;
+    private final Proxy mProxy;
     private final HttpResponseFuture mFuture;
     private final Map<String, Object> mHeaders;
 
     public ConnectionListener(HttpClientConfig conf,
-            HttpResponseFuture future, Map<String, Object> header) {
+            HttpResponseFuture future, Map<String, Object> header, Proxy proxy) {
         mHeaders = header;
         mConf = conf;
         mFuture = future;
+        mProxy = proxy;
     }
 
     public void operationComplete(ChannelFuture f) throws Exception {
@@ -39,9 +43,10 @@ public class ConnectionListener implements ChannelFutureListener {
         if (f.isSuccess()) {
             channel.getPipeline().getContext(ResponseHandler.class)
                     .setAttachment(mFuture);
-
+            String path = mProxy.type() == Type.HTTP ? mFuture.uri.toString()
+                    : getPath(mFuture.uri);
             final HttpRequest request = new DefaultHttpRequest(HTTP_1_1, GET,
-                    getPath(mFuture.uri));
+                    path);
             request.setHeader(HOST, mFuture.uri.getHost());
             request.setHeader(USER_AGENT, mConf.userAgent);
             request.setHeader(ACCEPT, "*/*");

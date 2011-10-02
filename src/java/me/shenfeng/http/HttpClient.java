@@ -8,14 +8,19 @@ import static org.jboss.netty.channel.Channels.pipeline;
 import static org.jboss.netty.util.ThreadNameDeterminer.CURRENT;
 import static org.jboss.netty.util.ThreadRenamingRunnable.setThreadNameDeterminer;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.management.RuntimeErrorException;
 
 import me.shenfeng.PrefixThreadFactory;
 import me.shenfeng.dns.DnsClient;
@@ -42,51 +47,42 @@ import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+class Decoder extends HttpResponseDecoder {
+    protected Object decode(ChannelHandlerContext ctx, Channel channel,
+            ChannelBuffer buffer, State state) throws Exception {
+        HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
+        if (future != null) {
+            future.touch();
+        }
+        return super.decode(ctx, channel, buffer, state);
+    }
+}
+
 public class HttpClient implements HttpClientConstant {
 
     static final Logger logger = LoggerFactory.getLogger(HttpClient.class);
 
-    private final ClientBootstrap mBootstrap;
     private final ChannelGroup mAllChannels;
-    private final HttpClientConfig mConf;
-    private final ExecutorService mWorker;
+    private final ClientBootstrap mBootstrap;
     private final ExecutorService mBoss;
-    private volatile boolean mRunning = true;
+    private final HttpClientConfig mConf;
     private final DnsClient mDns;
-    private Thread mTimeoutThread;
     private final List<HttpResponseFuture> mFutures = new LinkedList<HttpResponseFuture>();
-
-    private void startTimeoutThread() {
-        mTimeoutThread = new Thread(new Runnable() {
-            public void run() {
-                try {
-                    while (mRunning) {
-                        Thread.sleep(mConf.timerInterval);
-                        synchronized (mFutures) {
-                            final Iterator<HttpResponseFuture> it = mFutures.iterator();
-                            while (it.hasNext()) {
-                                HttpResponseFuture r = it.next();
-                                if (r.isDone() || r.isTimeout()) {
-                                    it.remove();
-                                }
-                            }
-                        }
-                    }
-                } catch (InterruptedException ignore) {
-                }
-            }
-        }, TIMER_NAME);
-
-        mTimeoutThread.start();
-    }
+    private volatile boolean mRunning = true;
+    private Thread mTimeoutThread;
+    private final ExecutorService mWorker;
 
     public HttpClient() {
         this(new HttpClientConfig());
     }
 
     public HttpClient(HttpClientConfig conf) {
-        mDns = new DnsClient(new DnsClientConfig(conf.dnsTimeout,
-                conf.timerInterval));
+        if (conf.useOwnDNS) {
+            mDns = new DnsClient(new DnsClientConfig(conf.dnsTimeout,
+                    conf.timerInterval));
+        } else {
+            mDns = null;
+        }
         mConf = conf;
         setThreadNameDeterminer(CURRENT);
         mBoss = newCachedThreadPool(new PrefixThreadFactory(
@@ -112,25 +108,61 @@ public class HttpClient implements HttpClientConstant {
         mTimeoutThread.interrupt();
         mAllChannels.close().awaitUninterruptibly();
         mBootstrap.releaseExternalResources();
-        mDns.close();
+        if (mDns != null)
+            mDns.close();
     }
 
-    private void connect(URI uri, String ip, HttpResponseFuture futrue,
-            Map<String, Object> headers) {
-        ChannelFuture cf = mBootstrap.connect(new InetSocketAddress(ip,
-                getPort(uri)));
+    private void connect(InetSocketAddress addr, HttpResponseFuture futrue,
+            Map<String, Object> headers, Proxy proxy) {
+        ChannelFuture cf = mBootstrap.connect(addr);
         Channel ch = cf.getChannel();
         futrue.setChannel(ch);
         mAllChannels.add(ch);
         ch.getPipeline().getContext(Decoder.class).setAttachment(futrue);
-        cf.addListener(new ConnectionListener(mConf, futrue, headers));
+        cf.addListener(new ConnectionListener(mConf, futrue, headers, proxy));
     }
 
     public HttpResponseFuture execGet(final URI uri,
             final Map<String, Object> headers) {
-        final String host = uri.getHost();
+        return execGet(uri, headers, Proxy.NO_PROXY);
+    }
+
+    public HttpResponseFuture execGet(final URI uri,
+            final Map<String, Object> headers, Proxy proxy) {
         final HttpResponseFuture resp = new HttpResponseFuture(
                 mConf.requestTimeoutInMs, uri);
+        switch (proxy.type()) {
+        case DIRECT:
+            if (mConf.useOwnDNS) {
+                resolveConnect(uri, headers, resp);
+            } else {
+                try {
+                    InetSocketAddress addr = new InetSocketAddress(
+                            InetAddress.getByName(uri.getHost()),
+                            getPort(uri));
+                    connect(addr, resp, headers, proxy);
+                } catch (UnknownHostException e) {
+                    resp.done(UNKOWN_HOST);
+                }
+            }
+            break;
+        case HTTP:
+            connect((InetSocketAddress) proxy.address(), resp, headers, proxy);
+            break;
+        default:
+            throw new RuntimeErrorException(null,
+                    "Only http proxy is supported currently");
+
+        }
+        synchronized (mFutures) {
+            mFutures.add(resp);
+        }
+        return resp;
+    }
+
+    private void resolveConnect(final URI uri,
+            final Map<String, Object> headers, final HttpResponseFuture resp) {
+        final String host = uri.getHost();
         final DnsResponseFuture dns = mDns.resolve(host);
         final AtomicInteger retry = new AtomicInteger(mConf.dnsRetryLimit + 1);
         final Runnable listener = new Runnable() {
@@ -153,17 +185,37 @@ public class HttpClient implements HttpClientConstant {
                         mDns.resolve(host).addListener(this);
                     }
                 } else {
-                    connect(uri, ip, resp, headers);
+                    connect(new InetSocketAddress(ip, getPort(uri)), resp,
+                            headers, Proxy.NO_PROXY);
                     resp.touch();
                 }
             }
         };
         dns.addListener(listener);
+    }
 
-        synchronized (mFutures) {
-            mFutures.add(resp);
-        }
-        return resp;
+    private void startTimeoutThread() {
+        mTimeoutThread = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    while (mRunning) {
+                        Thread.sleep(mConf.timerInterval);
+                        synchronized (mFutures) {
+                            final Iterator<HttpResponseFuture> it = mFutures.iterator();
+                            while (it.hasNext()) {
+                                HttpResponseFuture r = it.next();
+                                if (r.isDone() || r.isTimeout()) {
+                                    it.remove();
+                                }
+                            }
+                        }
+                    }
+                } catch (InterruptedException ignore) {
+                }
+            }
+        }, TIMER_NAME);
+
+        mTimeoutThread.start();
     }
 }
 
@@ -179,29 +231,10 @@ class HttpClientPipelineFactory implements ChannelPipelineFactory {
     }
 }
 
-class Decoder extends HttpResponseDecoder {
-    protected Object decode(ChannelHandlerContext ctx, Channel channel,
-            ChannelBuffer buffer, State state) throws Exception {
-        HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
-        if (future != null) {
-            future.touch();
-        }
-        return super.decode(ctx, channel, buffer, state);
-    }
-}
-
 class ResponseHandler extends SimpleChannelUpstreamHandler {
 
     private static Logger logger = LoggerFactory
             .getLogger(ResponseHandler.class);
-
-    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)
-            throws Exception {
-        HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
-        HttpResponse response = (HttpResponse) e.getMessage();
-        ctx.getChannel().close();
-        future.done(response);
-    }
 
     public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
             throws Exception {
@@ -214,5 +247,13 @@ class ResponseHandler extends SimpleChannelUpstreamHandler {
         } else {
             logger.trace(cause.getMessage(), cause);
         }
+    }
+
+    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)
+            throws Exception {
+        HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
+        HttpResponse response = (HttpResponse) e.getMessage();
+        ctx.getChannel().close();
+        future.done(response);
     }
 }

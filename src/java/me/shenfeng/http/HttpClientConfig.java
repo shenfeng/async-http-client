@@ -7,6 +7,7 @@ public class HttpClientConfig {
     protected int dnsRetryLimit = 3;
     protected int dnsTimeout = 3000;
     protected int receiveBuffer = 16384;
+    protected boolean useOwnDNS = true;
     protected int requestTimeoutInMs = 20000;
     protected int sendBuffer = 2048;
     protected int timerInterval = 1500;
@@ -15,6 +16,10 @@ public class HttpClientConfig {
     protected int workerThread = 1;
 
     public HttpClientConfig() {
+    }
+
+    public void setUseOwnDNS(boolean useOwnDNS) {
+        this.useOwnDNS = useOwnDNS;
     }
 
     public void setBossNamePrefix(String bossNamePrefix) {
