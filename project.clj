@@ -1,6 +1,7 @@
 (defproject me.shenfeng/netty-http "1.0.0-SNAPSHOT"
   :description "http client based on netty"
   :java-source-path "src/java"
+  :javac-options {:debug "true" :fork "true"}
   :warn-on-reflection true
   :repositories {"JBoss"
                  "http://repository.jboss.org/nexus/content/groups/public/"}
