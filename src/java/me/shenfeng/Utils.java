@@ -58,7 +58,7 @@ public class Utils {
             return path + "?" + query;
     }
 
-    public static List getNameServer() {
+    public static List<String> getNameServer() {
         return sun.net.dns.ResolverConfiguration.open().nameservers();
     }
 
