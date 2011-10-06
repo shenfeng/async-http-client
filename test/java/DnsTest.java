@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import me.shenfeng.Utils;
 import me.shenfeng.dns.DnsClient;
 import me.shenfeng.dns.DnsResponseFuture;
 
@@ -17,6 +18,19 @@ public class DnsTest {
     @Before
     public void setup() {
         client = new DnsClient();
+    }
+
+    @Test
+    public void testns() {
+        System.out.println(Utils.getNameServer());
+    }
+
+    @Test
+    public void testTimeOut() throws InterruptedException, ExecutionException {
+        DnsResponseFuture future = client
+                .resolve("tianlongbabu3renjiebaimingcheng.cnjsj.net");
+        String ip = future.get();
+        System.out.println(ip);
     }
 
     @Test
@@ -45,17 +59,25 @@ public class DnsTest {
     }
 
     @Test
+    public void testMine() throws InterruptedException, ExecutionException {
+        DnsResponseFuture future = client.resolve("shenfeng.me");
+        String ip = future.get();
+
+        System.out.println(ip);// 112.126.149.103
+    }
+
+    @Test
     public void testHomeMadeDnsResolver() throws InterruptedException,
             ExecutionException {
         String[] hosts = new String[] { "shenfeng.me", "onycloud.com",
                 "trakrapp.com", "rssminer.net" };
         List<DnsResponseFuture> list = new ArrayList<DnsResponseFuture>();
-        for (String host : hosts) {
+        for (final String host : hosts) {
             final DnsResponseFuture f = client.resolve(host);
             f.addListener(new Runnable() {
                 public void run() {
                     try {
-                        System.out.println("aaa\t" + f.get());
+                        System.out.println(host + "\t" + f.get());
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -64,8 +86,7 @@ public class DnsTest {
             list.add(f);
             // System.out.println(ip);
         }
-        for (DnsResponseFuture f : list) {
-            f.get();
-        }
+
+        // Thread.sleep(5000);
     }
 }

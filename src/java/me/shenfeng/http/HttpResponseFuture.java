@@ -59,15 +59,16 @@ public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
 
     public boolean abort(Throwable t) {
         HttpResponse resp = UNKOWN_ERROR;
+        String msg = t.getMessage();
         if (t instanceof TooLongFrameException) {
             resp = TOO_LARGE;
         } else if (t instanceof ConnectException) {
-            if (t.getMessage().indexOf("timed out") != -1)
+            if (msg != null && msg.indexOf("timed out") != -1)
                 resp = CONNECTION_TIMEOUT;
             else
                 resp = CONNECTION_ERROR;
-        } else if (t instanceof IOException
-                && t.getMessage().indexOf("reset") != -1) {
+        } else if (t instanceof IOException && msg != null
+                && msg.indexOf("reset") != -1) {
             resp = CONNECTION_RESET;
         }
         return done(resp);
