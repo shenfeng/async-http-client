@@ -53,6 +53,17 @@ public class HttpClientTest {
     }
 
     @Test
+    public void testCheckTimeout() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            final URI uri = new URI("http://shenfeng.me");
+            final HttpResponseFuture resp = client.execGet(uri, header);
+            HttpResponse r = resp.get();
+            String s = Utils.bodyStr(r);
+            System.out.println(s.length());
+        }
+    }
+
+    @Test
     public void testPotentialError() throws URISyntaxException,
             InterruptedException, ExecutionException {
         for (int i = 0; i < 1; ++i) {

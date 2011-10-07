@@ -9,6 +9,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -60,13 +61,11 @@ public class DnsPrefecher implements DnsClientConstant {
         }
     }
 
-    public void prefetch(List<String> domains) throws IOException {
-        for (String domain : domains) {
-            prefetch(domain);
-        }
+    public void prefetch(URI uri) {
+        prefetch(uri.getHost());
     }
 
-    public void prefetch(String domain) throws IOException {
+    public void prefetch(String domain) {
         if (Utils.isIP(domain))
             return;
 
@@ -94,10 +93,14 @@ public class DnsPrefecher implements DnsClientConstant {
         buffer.writeByte(0);
         buffer.writeBytes(A_IN);
 
-        for (InetSocketAddress server : mServers) {
-            DatagramPacket packet = new DatagramPacket(buffer.array(),
-                    buffer.readerIndex(), buffer.readableBytes(), server);
-            mSocket.send(packet);
+        try {
+            for (InetSocketAddress server : mServers) {
+                DatagramPacket packet = new DatagramPacket(buffer.array(),
+                        buffer.readerIndex(), buffer.readableBytes(), server);
+                mSocket.send(packet);
+            }
+        } catch (IOException e) {
+            logger.info("prefetch dns: " + domain, e);
         }
     }
 }

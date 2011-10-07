@@ -4,10 +4,8 @@ public class HttpClientConfig {
 
     protected String bossNamePrefix = "Http Boss";
     protected int connectionTimeOutInMs = 4500;
-    protected int dnsRetryLimit = 3;
-    protected int dnsTimeout = 3000;
+    protected int maxLength = 1024 * 512;
     protected int receiveBuffer = 16384;
-    protected boolean useOwnDNS = true;
     protected int requestTimeoutInMs = 20000;
     protected int sendBuffer = 2048;
     protected int timerInterval = 1500;
@@ -18,24 +16,16 @@ public class HttpClientConfig {
     public HttpClientConfig() {
     }
 
-    public void setUseOwnDNS(boolean useOwnDNS) {
-        this.useOwnDNS = useOwnDNS;
-    }
-
     public void setBossNamePrefix(String bossNamePrefix) {
         this.bossNamePrefix = bossNamePrefix;
     }
 
+    public void setMaxLength(int maxLength) {
+        this.maxLength = maxLength;
+    }
+
     public void setConnectionTimeOutInMs(int connectionTimeOutInMs) {
         this.connectionTimeOutInMs = connectionTimeOutInMs;
-    }
-
-    public void setDnsRetryLimit(int dnsRetryLimit) {
-        this.dnsRetryLimit = dnsRetryLimit;
-    }
-
-    public void setDnsTimeout(int dnsTimeout) {
-        this.dnsTimeout = dnsTimeout;
     }
 
     public void setReceiveBuffer(int receiveBuffer) {

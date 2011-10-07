@@ -70,12 +70,11 @@ public class DnsClient implements DnsClientConstant {
     }
 
     public DnsClient(DnsClientConfig conf) {
-        List servers = Utils.getNameServer();
+        List<String> servers = Utils.getNameServer();
         mDnsServers = new InetSocketAddress[servers.size()];
 
         for (int i = 0; i < servers.size(); ++i) {
-            mDnsServers[i] = new InetSocketAddress(servers.get(i).toString(),
-                    53);
+            mDnsServers[i] = new InetSocketAddress(servers.get(i), 53);
         }
 
         mConf = conf;
