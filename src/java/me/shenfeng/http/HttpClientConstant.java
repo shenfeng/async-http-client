@@ -42,4 +42,7 @@ public interface HttpClientConstant {
     final static HttpResponse IGNORED_URL = new DefaultHttpResponse(HTTP_1_1,
             new HttpResponseStatus(182, "ignored url"));
 
+    final static HttpResponse UNKNOWN_CONTENT = new DefaultHttpResponse(
+            HTTP_1_1, new HttpResponseStatus(190, "unknow content type"));
+
 }

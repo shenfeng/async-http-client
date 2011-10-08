@@ -1,10 +1,13 @@
 package me.shenfeng.http;
 
+import java.util.List;
+
 public class HttpClientConfig {
 
     protected String bossNamePrefix = "Http Boss";
     protected int connectionTimeOutInMs = 4500;
     protected int maxLength = 1024 * 512;
+    protected List<String> acceptedContentTypes;
     protected int receiveBuffer = 16384;
     protected int requestTimeoutInMs = 20000;
     protected int sendBuffer = 2048;
@@ -13,19 +16,22 @@ public class HttpClientConfig {
     protected String workerNamePrefix = "Http Worker";
     protected int workerThread = 1;
 
-    public HttpClientConfig() {
+    public HttpClientConfig() {}
+
+    public void setAcceptedContentTypes(List<String> acceptedContentTypes) {
+        this.acceptedContentTypes = acceptedContentTypes;
     }
 
     public void setBossNamePrefix(String bossNamePrefix) {
         this.bossNamePrefix = bossNamePrefix;
     }
 
-    public void setMaxLength(int maxLength) {
-        this.maxLength = maxLength;
-    }
-
     public void setConnectionTimeOutInMs(int connectionTimeOutInMs) {
         this.connectionTimeOutInMs = connectionTimeOutInMs;
+    }
+
+    public void setMaxLength(int maxLength) {
+        this.maxLength = maxLength;
     }
 
     public void setReceiveBuffer(int receiveBuffer) {
