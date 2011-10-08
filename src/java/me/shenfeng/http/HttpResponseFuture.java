@@ -2,9 +2,9 @@ package me.shenfeng.http;
 
 import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static me.shenfeng.http.HttpClientConstant.CONNECTION_ERROR;
-import static me.shenfeng.http.HttpClientConstant.CONNECTION_RESET;
-import static me.shenfeng.http.HttpClientConstant.CONNECTION_TIMEOUT;
+import static me.shenfeng.http.HttpClientConstant.CONN_ERROR;
+import static me.shenfeng.http.HttpClientConstant.CONN_RESET;
+import static me.shenfeng.http.HttpClientConstant.CONN_TIMEOUT;
 import static me.shenfeng.http.HttpClientConstant.TIMEOUT;
 import static me.shenfeng.http.HttpClientConstant.TOO_LARGE;
 import static me.shenfeng.http.HttpClientConstant.UNKOWN_ERROR;
@@ -64,12 +64,12 @@ public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
             resp = TOO_LARGE;
         } else if (t instanceof ConnectException) {
             if (msg != null && msg.indexOf("timed out") != -1)
-                resp = CONNECTION_TIMEOUT;
+                resp = CONN_TIMEOUT;
             else
-                resp = CONNECTION_ERROR;
+                resp = CONN_ERROR;
         } else if (t instanceof IOException && msg != null
                 && msg.indexOf("reset") != -1) {
-            resp = CONNECTION_RESET;
+            resp = CONN_RESET;
         }
         return done(resp);
     }

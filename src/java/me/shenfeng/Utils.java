@@ -137,25 +137,25 @@ public class Utils {
                         ZLIB_OR_NONE));
             }
 
-            ChannelBuffer decoded = ChannelBuffers.EMPTY_BUFFER;
+            ChannelBuffer body = m.getContent();
 
             if (decoder != null) {
-                decoder.offer(m.getContent());
+                decoder.offer(body);
                 ChannelBuffer b = wrappedBuffer(decoder
                         .pollAll(new ChannelBuffer[decoder.size()]));
                 if (decoder.finish()) {
                     ChannelBuffer r = wrappedBuffer(decoder
                             .pollAll(new ChannelBuffer[decoder.size()]));
-                    decoded = wrappedBuffer(b, r);
+                    body = wrappedBuffer(b, r);
                 } else {
-                    decoded = b;
+                    body = b;
                 }
+                m.setContent(body);// for detect charset
             }
-            m.setContent(decoded);// for detect charset
             Charset ch = detectCharset(m);
             if (ch == null)
                 ch = UTF_8;
-            return new String(decoded.array(), 0, decoded.readableBytes(), ch);
+            return new String(body.array(), 0, body.readableBytes(), ch);
         } catch (CodecEmbedderException e) {
             logger.trace(e.getMessage(), e); // incorrect CRC32 checksum
             return "";
