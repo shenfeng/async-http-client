@@ -5,6 +5,7 @@ import static org.jboss.netty.handler.codec.compression.ZlibWrapper.GZIP;
 import static org.jboss.netty.handler.codec.compression.ZlibWrapper.ZLIB_OR_NONE;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_ENCODING;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
+import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.TRANSFER_ENCODING;
 import static org.jboss.netty.util.CharsetUtil.UTF_8;
 
 import java.net.URI;
@@ -12,6 +13,7 @@ import java.nio.charset.Charset;
 import java.util.List;
 
 import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.handler.codec.compression.ZlibDecoder;
 import org.jboss.netty.handler.codec.embedder.CodecEmbedderException;
 import org.jboss.netty.handler.codec.embedder.DecoderEmbedder;
@@ -114,6 +116,10 @@ public class Utils {
     }
 
     public static String bodyStr(HttpResponse m) {
+
+        // TODO it's a bug, should not happen, "http://logos.md/2008/"
+        m.removeHeader(TRANSFER_ENCODING);
+
         String type = m.getHeader(CONTENT_TYPE);
         if (type != null && type.toLowerCase().indexOf("text") == -1)
             return ""; // do not try to decode non text resp
@@ -131,24 +137,25 @@ public class Utils {
                         ZLIB_OR_NONE));
             }
 
-            ChannelBuffer buffer = m.getContent();
+            ChannelBuffer decoded = ChannelBuffers.EMPTY_BUFFER;
+
             if (decoder != null) {
-                decoder.offer(buffer);
+                decoder.offer(m.getContent());
                 ChannelBuffer b = wrappedBuffer(decoder
                         .pollAll(new ChannelBuffer[decoder.size()]));
                 if (decoder.finish()) {
                     ChannelBuffer r = wrappedBuffer(decoder
                             .pollAll(new ChannelBuffer[decoder.size()]));
-                    buffer = wrappedBuffer(b, r);
+                    decoded = wrappedBuffer(b, r);
                 } else {
-                    buffer = b;
+                    decoded = b;
                 }
             }
-            m.setContent(buffer);// for detect charset
+            m.setContent(decoded);// for detect charset
             Charset ch = detectCharset(m);
             if (ch == null)
                 ch = UTF_8;
-            return new String(buffer.array(), 0, buffer.readableBytes(), ch);
+            return new String(decoded.array(), 0, decoded.readableBytes(), ch);
         } catch (CodecEmbedderException e) {
             logger.trace(e.getMessage(), e); // incorrect CRC32 checksum
             return "";
