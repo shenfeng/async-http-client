@@ -1,8 +1,8 @@
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.net.Proxy.Type;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.Proxy.Type;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -44,8 +44,32 @@ public class HttpClientTest {
     }
 
     @Test
+    public void testHttps() throws URISyntaxException, InterruptedException,
+            ExecutionException {
+        URI uri = new URI("https://trakrapp.com");
+        HttpResponseFuture future = client.execGet(uri, header);
+        System.out.println(future.get());
+        System.out.println(Utils.bodyStr(future.get()));
+    }
+
+    @Test
+    public void testHttpAndHttps() throws InterruptedException,
+            ExecutionException, URISyntaxException {
+        String[] urls = new String[] { "http://www.baidu.com",
+                "https://www.google.com", "http://shenfeng.me",
+                "https://trakrapp.com", "https://github.com" };
+        for (String url : urls) {
+            URI uri = new URI(url);
+            HttpResponseFuture future = client.execGet(uri, header);
+            System.out.println(future.get());
+            System.out.println(Utils.bodyStr(future.get()).length() + "\t"
+                    + url);
+        }
+    }
+
+    @Test
     public void testNoProxy() throws Exception {
-        final URI uri = new URI("http://shenfeng.me");
+        final URI uri = new URI("http://github.com");
         final HttpResponseFuture resp = client.execGet(uri, header);
         HttpResponse r = resp.get();
         String s = Utils.bodyStr(r);
@@ -160,16 +184,6 @@ public class HttpClientTest {
             }
         }
         Thread.sleep(10000);
-    }
-
-    public void testHttps() throws URISyntaxException, InterruptedException,
-            ExecutionException {
-        URI uri = new URI("https://trakrapp.com");
-
-        HttpResponseFuture future = client.execGet(uri, header);
-        future.get();
-        Thread.sleep(1000000);
-        // future.abort(t)
     }
 
     @Test

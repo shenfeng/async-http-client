@@ -33,6 +33,12 @@ public class UtilsTest {
     }
 
     @Test
+    public void testGetPort() throws URISyntaxException {
+        Assert.assertEquals(80, Utils.getPort(new URI("http://google.com")));
+        Assert.assertEquals(443, Utils.getPort(new URI("https://google.com")));
+    }
+
+    @Test
     public void testBytes() {
 
         for (int i = 0; i < 256; ++i) {

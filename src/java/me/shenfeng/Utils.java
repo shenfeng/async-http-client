@@ -69,7 +69,10 @@ public class Utils {
     public static int getPort(URI uri) {
         int port = uri.getPort();
         if (port == -1) {
-            port = 80;
+            if ("https".equals(uri.getScheme()))
+                port = 443;
+            else
+                port = 80;
         }
         return port;
     }

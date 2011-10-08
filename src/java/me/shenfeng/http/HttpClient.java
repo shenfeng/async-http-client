@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 
 import javax.management.RuntimeErrorException;
+import javax.net.ssl.SSLEngine;
 
 import me.shenfeng.PrefixThreadFactory;
 
@@ -39,6 +40,7 @@ import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
 import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
+import org.jboss.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +60,8 @@ public class HttpClient implements HttpClientConstant {
     static final Logger logger = LoggerFactory.getLogger(HttpClient.class);
 
     private final ChannelGroup mAllChannels;
-    private final ClientBootstrap mBootstrap;
+    private final ClientBootstrap mHttpBootstrap;
+    private final ClientBootstrap mHttpsBootstrap;
     private volatile long mLastCheckTime = currentTimeMillis();
     private final HttpClientConfig mConf;
     private final Queue<HttpResponseFuture> mFutures = new ConcurrentLinkedQueue<HttpResponseFuture>();
@@ -77,25 +80,37 @@ public class HttpClient implements HttpClientConstant {
         NioClientSocketChannelFactory factory = new NioClientSocketChannelFactory(
                 boss, worker, conf.workerThread);
 
-        mBootstrap = new ClientBootstrap(factory);
-        mBootstrap.setPipelineFactory(new HttpClientPipelineFactory(
+        mHttpsBootstrap = new ClientBootstrap(factory);
+        mHttpsBootstrap.setPipelineFactory(new HttpsClientPipelineFactory(
                 mConf.maxLength));
-        mBootstrap.setOption("connectTimeoutMillis",
-                conf.connectionTimeOutInMs);
-        mBootstrap.setOption("receiveBufferSize", conf.receiveBuffer);
-        mBootstrap.setOption("sendBufferSize", conf.sendBuffer);
-        mBootstrap.setOption("reuseAddress", true);
+
+        mHttpBootstrap = new ClientBootstrap(factory);
+        mHttpBootstrap.setPipelineFactory(new HttpClientPipelineFactory(
+                mConf.maxLength));
+
+        conf(mHttpBootstrap);
+        conf(mHttpsBootstrap);
+
         mAllChannels = new DefaultChannelGroup("client");
+    }
+
+    private void conf(ClientBootstrap bootstrap) {
+        bootstrap.setOption("connectTimeoutMillis",
+                mConf.connectionTimeOutInMs);
+        bootstrap.setOption("receiveBufferSize", mConf.receiveBuffer);
+        bootstrap.setOption("sendBufferSize", mConf.sendBuffer);
+        bootstrap.setOption("reuseAddress", true);
     }
 
     public void close() {
         mAllChannels.close().awaitUninterruptibly();
-        mBootstrap.releaseExternalResources();
+        mHttpBootstrap.releaseExternalResources();
     }
 
     private void connect(InetSocketAddress addr, HttpResponseFuture futrue,
-            Map<String, Object> headers, Proxy proxy) {
-        ChannelFuture cf = mBootstrap.connect(addr);
+            Map<String, Object> headers, Proxy proxy, boolean ssl) {
+        ClientBootstrap bootstrap = ssl ? mHttpsBootstrap : mHttpBootstrap;
+        ChannelFuture cf = bootstrap.connect(addr);
         Channel ch = cf.getChannel();
         futrue.setChannel(ch);
         mAllChannels.add(ch);
@@ -118,15 +133,17 @@ public class HttpClient implements HttpClientConstant {
         switch (proxy.type()) {
         case DIRECT:
             try {
+                boolean ssl = "https".equals(uri.getScheme());
                 InetSocketAddress addr = new InetSocketAddress(
                         InetAddress.getByName(uri.getHost()), getPort(uri));
-                connect(addr, resp, headers, proxy);
+                connect(addr, resp, headers, proxy, ssl);
             } catch (UnknownHostException e) {
                 resp.done(UNKOWN_HOST);
             }
             break;
         case HTTP:
-            connect((InetSocketAddress) proxy.address(), resp, headers, proxy);
+            connect((InetSocketAddress) proxy.address(), resp, headers,
+                    proxy, false);
             break;
         default:
             throw new RuntimeErrorException(null,
@@ -168,6 +185,30 @@ class HttpClientPipelineFactory implements ChannelPipelineFactory {
         pipeline.addLast("handler", new ResponseHandler());
         return pipeline;
     }
+}
+
+class HttpsClientPipelineFactory implements ChannelPipelineFactory {
+
+    final int maxLength;
+
+    public HttpsClientPipelineFactory(int maxLength) {
+        this.maxLength = maxLength;
+    }
+
+    public ChannelPipeline getPipeline() throws Exception {
+        ChannelPipeline pipeline = pipeline();
+        SSLEngine engine = SslContextFactory.getClientContext()
+                .createSSLEngine();
+        engine.setUseClientMode(true);
+        pipeline.addLast("ssl", new SslHandler(engine));
+
+        pipeline.addLast("decoder", new Decoder());
+        pipeline.addLast("encoder", new HttpRequestEncoder());
+        pipeline.addLast("aggregator", new HttpChunkAggregator(maxLength));
+        pipeline.addLast("handler", new ResponseHandler());
+        return pipeline;
+    }
+
 }
 
 class ResponseHandler extends SimpleChannelUpstreamHandler {
