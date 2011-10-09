@@ -2,17 +2,21 @@ package me.shenfeng.http;
 
 import java.util.List;
 
+import org.jboss.netty.handler.codec.http.HttpMessageDecoder;
+
 public class HttpClientConfig {
 
+    protected List<String> acceptedContentTypes;
     protected String bossNamePrefix = "Http Boss";
     protected int connectionTimeOutInMs = 4500;
+    protected int maxChunkSize = 32 * 1024;
     protected int maxLength = 1024 * 512;
-    protected List<String> acceptedContentTypes;
     protected int receiveBuffer = 16384;
     protected int requestTimeoutInMs = 20000;
     protected int sendBuffer = 2048;
     protected int timerInterval = 1500;
     protected String userAgent = "Mozilla/5.0 (compatible; Rssminer/1.0; +http://rssminer.net)";
+
     protected String workerNamePrefix = "Http Worker";
     protected int workerThread = 1;
 
@@ -28,6 +32,13 @@ public class HttpClientConfig {
 
     public void setConnectionTimeOutInMs(int connectionTimeOutInMs) {
         this.connectionTimeOutInMs = connectionTimeOutInMs;
+    }
+
+    /**
+     * @see HttpMessageDecoder
+     */
+    public void setMaxChunkSize(int maxChunkSize) {
+        this.maxChunkSize = maxChunkSize;
     }
 
     public void setMaxLength(int maxLength) {

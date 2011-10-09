@@ -80,9 +80,7 @@ class Decoder extends HttpResponseDecoder {
     }
 
     public Decoder(HttpClientConfig conf) {
-        // 128k, less chunks, and allow other logic to abort early when
-        // resource is large, but unwanted
-        super(4096, 8192, 128 * 1024);
+        super(4096, 8192, conf.maxChunkSize);
         this.conf = conf;
     }
 }
