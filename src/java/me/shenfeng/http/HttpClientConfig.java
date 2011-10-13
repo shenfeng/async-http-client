@@ -11,16 +11,17 @@ public class HttpClientConfig {
     protected int connectionTimeOutInMs = 4500;
     protected int maxChunkSize = 32 * 1024;
     protected int maxLength = 1024 * 512;
-    protected int receiveBuffer = 16384;
+    protected int receiveBuffer = 1024 * 32;
+    protected int sendBuffer = 1024 * 32;
     protected int requestTimeoutInMs = 20000;
-    protected int sendBuffer = 2048;
     protected int timerInterval = 1500;
     protected String userAgent = "Mozilla/5.0 (compatible; Rssminer/1.0; +http://rssminer.net)";
 
     protected String workerNamePrefix = "Http Worker";
     protected int workerThread = 1;
 
-    public HttpClientConfig() {}
+    public HttpClientConfig() {
+    }
 
     public void setAcceptedContentTypes(List<String> acceptedContentTypes) {
         this.acceptedContentTypes = acceptedContentTypes;

@@ -51,7 +51,7 @@ public class ConnectionListener implements ChannelFutureListener {
             request.setHeader(USER_AGENT, mConf.userAgent);
             request.setHeader(ACCEPT, "*/*");
             request.setHeader(ACCEPT_ENCODING, "gzip, deflate");
-            request.setHeader(CONNECTION, CLOSE);
+            request.setHeader(CONNECTION, "close");
 
             for (Map.Entry<String, Object> entry : mHeaders.entrySet()) {
                 request.addHeader(entry.getKey(), entry.getValue());
