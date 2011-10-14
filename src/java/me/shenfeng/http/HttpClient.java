@@ -3,11 +3,7 @@ package me.shenfeng.http;
 import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static me.shenfeng.Utils.getPort;
-import static me.shenfeng.http.HttpClientConstant.TOO_LARGE;
-import static me.shenfeng.http.HttpClientConstant.UNKNOWN_CONTENT;
 import static org.jboss.netty.channel.Channels.pipeline;
-import static org.jboss.netty.handler.codec.http.HttpHeaders.getContentLength;
-import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
 import static org.jboss.netty.util.ThreadNameDeterminer.CURRENT;
 import static org.jboss.netty.util.ThreadRenamingRunnable.setThreadNameDeterminer;
 
@@ -26,64 +22,21 @@ import javax.management.RuntimeErrorException;
 import javax.net.ssl.SSLEngine;
 
 import me.shenfeng.PrefixThreadFactory;
+import me.shenfeng.ssl.SslContextFactory;
 
 import org.jboss.netty.bootstrap.ClientBootstrap;
-import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.ExceptionEvent;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
-import org.jboss.netty.handler.codec.http.HttpMessage;
 import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
-import org.jboss.netty.handler.codec.http.HttpResponse;
-import org.jboss.netty.handler.codec.http.HttpResponseDecoder;
 import org.jboss.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-class Decoder extends HttpResponseDecoder {
-    final HttpClientConfig conf;
-
-    protected Object decode(ChannelHandlerContext ctx, Channel channel,
-            ChannelBuffer buffer, State state) throws Exception {
-        Object o = super.decode(ctx, channel, buffer, state);
-
-        HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
-        if (o instanceof HttpMessage && future != null) {
-            future.touch();
-            HttpMessage msg = (HttpMessage) o;
-            String type = msg.getHeader(CONTENT_TYPE);
-            if (getContentLength(msg) > conf.maxLength) {
-                future.done(TOO_LARGE);
-            } else if (type != null && conf.acceptedContentTypes != null) {
-                boolean accept = false;
-                for (String t : conf.acceptedContentTypes) {
-                    if (type.contains(t)) {
-                        accept = true;
-                        break;
-                    }
-                }
-                if (!accept) {
-                    future.done(UNKNOWN_CONTENT);
-                }
-            }
-        }
-        return o;
-    }
-
-    public Decoder(HttpClientConfig conf) {
-        super(4096, 8192, conf.maxChunkSize);
-        this.conf = conf;
-    }
-}
 
 public class HttpClient implements HttpClientConstant {
 
@@ -243,31 +196,4 @@ class HttpsClientPipelineFactory implements ChannelPipelineFactory {
         return pipeline;
     }
 
-}
-
-class ResponseHandler extends SimpleChannelUpstreamHandler {
-
-    private static Logger logger = LoggerFactory
-            .getLogger(ResponseHandler.class);
-
-    public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e)
-            throws Exception {
-        ctx.getChannel().close();
-        Throwable cause = e.getCause();
-        HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
-        if (future != null) {
-            logger.trace(future.uri.toString(), cause);
-            future.abort(cause);
-        } else {
-            logger.trace(cause.getMessage(), cause);
-        }
-    }
-
-    public void messageReceived(ChannelHandlerContext ctx, MessageEvent e)
-            throws Exception {
-        HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
-        HttpResponse response = (HttpResponse) e.getMessage();
-        ctx.getChannel().close();
-        future.done(response);
-    }
 }

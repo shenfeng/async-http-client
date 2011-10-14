@@ -1,4 +1,4 @@
-package me.shenfeng.http;
+package me.shenfeng.ssl;
 
 import javax.net.ssl.SSLContext;
 
