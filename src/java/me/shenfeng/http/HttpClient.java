@@ -18,7 +18,6 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 
-import javax.management.RuntimeErrorException;
 import javax.net.ssl.SSLEngine;
 
 import me.shenfeng.PrefixThreadFactory;
@@ -29,8 +28,6 @@ import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.group.ChannelGroup;
-import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
 import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
 import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
@@ -42,7 +39,6 @@ public class HttpClient implements HttpClientConstant {
 
     static final Logger logger = LoggerFactory.getLogger(HttpClient.class);
 
-    private final ChannelGroup mAllChannels;
     private final ClientBootstrap mHttpBootstrap;
     private final ClientBootstrap mHttpsBootstrap;
     private volatile long mLastCheckTime = currentTimeMillis();
@@ -74,7 +70,6 @@ public class HttpClient implements HttpClientConstant {
         conf(mHttpBootstrap);
         conf(mHttpsBootstrap);
 
-        mAllChannels = new DefaultChannelGroup("client");
     }
 
     private void conf(ClientBootstrap bootstrap) {
@@ -86,7 +81,6 @@ public class HttpClient implements HttpClientConstant {
     }
 
     public void close() {
-        mAllChannels.close().awaitUninterruptibly();
         mHttpBootstrap.releaseExternalResources();
     }
 
@@ -96,7 +90,6 @@ public class HttpClient implements HttpClientConstant {
         ChannelFuture cf = bootstrap.connect(addr);
         Channel ch = cf.getChannel();
         futrue.setChannel(ch);
-        mAllChannels.add(ch);
         ch.getPipeline().getContext(Decoder.class).setAttachment(futrue);
         cf.addListener(new ConnectionListener(mConf, futrue, headers, proxy));
     }
@@ -129,9 +122,8 @@ public class HttpClient implements HttpClientConstant {
                     proxy, false);
             break;
         default:
-            throw new RuntimeErrorException(null,
+            throw new RuntimeException(
                     "Only http proxy is supported currently");
-
         }
         mFutures.add(resp);
         return resp;
