@@ -115,13 +115,8 @@ public class Utils {
     }
 
     public static String bodyStr(HttpResponse m) {
-
         // TODO it's a bug, should not happen, "http://logos.md/2008/"
         m.removeHeader(TRANSFER_ENCODING);
-
-        String type = m.getHeader(CONTENT_TYPE);
-        if (type != null && type.toLowerCase().indexOf("text") == -1)
-            return ""; // do not try to decode non text resp
 
         try {
             String contentEncoding = m.getHeader(CONTENT_ENCODING);
