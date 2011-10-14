@@ -1,6 +1,7 @@
 package me.shenfeng.http;
 
 import static me.shenfeng.Utils.getPath;
+import static org.jboss.netty.buffer.ChannelBuffers.wrappedBuffer;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.ACCEPT;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.ACCEPT_ENCODING;
 import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONNECTION;
@@ -11,6 +12,7 @@ import static org.jboss.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 import java.net.Proxy;
 import java.net.Proxy.Type;
+import java.net.URI;
 import java.util.Map;
 
 import org.jboss.netty.channel.Channel;
@@ -38,31 +40,46 @@ public class ConnectionListener implements ChannelFutureListener {
         mProxy = proxy;
     }
 
+    public static ChannelFuture sendRequest(Channel channel, String host,
+            String path, String userAgent, Map<String, Object> headers) {
+        final HttpRequest request = new DefaultHttpRequest(HTTP_1_1, GET,
+                path);
+        request.setHeader(HOST, host);
+        request.setHeader(USER_AGENT, userAgent);
+        request.setHeader(ACCEPT, "*/*");
+        request.setHeader(ACCEPT_ENCODING, "gzip, deflate");
+        request.setHeader(CONNECTION, "close");
+
+        for (Map.Entry<String, Object> entry : headers.entrySet()) {
+            request.addHeader(entry.getKey(), entry.getValue());
+        }
+
+        return channel.write(request);
+    }
+
     public void operationComplete(ChannelFuture f) throws Exception {
         Channel channel = f.getChannel();
         if (f.isSuccess()) {
             channel.getPipeline().getContext(ResponseHandler.class)
                     .setAttachment(mFuture);
-            String path = mProxy.type() == Type.HTTP ? mFuture.uri.toString()
-                    : getPath(mFuture.uri);
-            final HttpRequest request = new DefaultHttpRequest(HTTP_1_1, GET,
-                    path);
-            request.setHeader(HOST, mFuture.uri.getHost());
-            request.setHeader(USER_AGENT, mConf.userAgent);
-            request.setHeader(ACCEPT, "*/*");
-            request.setHeader(ACCEPT_ENCODING, "gzip, deflate");
-            request.setHeader(CONNECTION, "close");
-
-            for (Map.Entry<String, Object> entry : mHeaders.entrySet()) {
-                request.addHeader(entry.getKey(), entry.getValue());
+            URI uri = mFuture.uri;
+            String userAgent = mConf.userAgent;
+            if (mProxy.type() == Type.SOCKS) {
+                channel.getPipeline().addFirst("socks",
+                        new SocksHandler(uri, mHeaders, userAgent, mFuture));
+                // write version and authen info
+                channel.write(wrappedBuffer(SocksHandler.VERSION_AUTH));
+            } else {
+                String path = mProxy.type() == Type.HTTP ? uri.toString()
+                        : getPath(uri);
+                sendRequest(channel, uri.getHost(), path, userAgent, mHeaders)
+                        .addListener(new ChannelFutureListener() {
+                            public void operationComplete(ChannelFuture future)
+                                    throws Exception {
+                                mFuture.touch();
+                            }
+                        });
             }
-
-            channel.write(request).addListener(new ChannelFutureListener() {
-                public void operationComplete(ChannelFuture future)
-                        throws Exception {
-                    mFuture.touch();
-                }
-            });
 
         } else {
             channel.close();

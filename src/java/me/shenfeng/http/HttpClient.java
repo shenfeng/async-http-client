@@ -118,6 +118,7 @@ public class HttpClient implements HttpClientConstant {
             }
             break;
         case HTTP:
+        case SOCKS:
             connect((InetSocketAddress) proxy.address(), resp, headers,
                     proxy, false);
             break;
