@@ -1,4 +1,4 @@
-An Async HTTP Client Based on Netty
+An Async HTTP Client Based on [Netty](http://netty.io/)
 
 I write this for my personal part time project
 [RSSMiner](http://rssminer.net), for the web crawler and feed fetcher module.
@@ -7,21 +7,20 @@ I write this for my personal part time project
 Features
 --------
 
-1. Asynchronous
-2. Minimum: just download webpages from Internet efficently.
-3. Support SOCKS5, HTTP proxy
-4. HTTPS(trust all)
-5. [Configurable](https://github.com/shenfeng/netty-http/blob/master/src/java/me/shenfeng/http/HttpClientConfig.java)
-6. [DNS prefetch](https://github.com/shenfeng/netty-http/blob/master/src/java/me/shenfeng/dns/DnsPrefecher.java),
-IPV4 only.
+* Asynchronous
+* Minimum: just download webpages from Internet efficently.
+* Support SOCKS v5, HTTP proxy
+* HTTPS(trust all)
+* [Configurable](https://github.com/shenfeng/netty-http/blob/master/src/java/me/shenfeng/http/HttpClientConfig.java)
+* [DNS prefetch](https://github.com/shenfeng/netty-http/blob/master/src/java/me/shenfeng/dns/DnsPrefecher.java),
 
 
-Non-features
+Limitations:
 ------------
-1. All Content are buffered in memory as byte array=> can not handle
-large file, anyway, It's meant to download webpages(zipped if server
+* All Content are buffered in memory as byte array=> can not handle
+large file. Anyway, it's meant to download webpages(zipped if server
 support)
-
+* Dns prefetch is IPV4 only.
 
 Example
 -------
