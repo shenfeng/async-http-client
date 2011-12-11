@@ -51,7 +51,7 @@ public class ConnectionListener implements ChannelFutureListener {
         request.setHeader(CONNECTION, "close");
 
         for (Map.Entry<String, Object> entry : headers.entrySet()) {
-            request.addHeader(entry.getKey(), entry.getValue());
+            request.setHeader(entry.getKey(), entry.getValue());
         }
 
         return channel.write(request);
