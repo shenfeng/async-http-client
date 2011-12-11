@@ -11,8 +11,8 @@ Features
 * Minimum: just download webpages from Internet efficently.
 * Support SOCKS v5, HTTP proxy
 * HTTPS(trust all)
-* [Configurable](https://github.com/shenfeng/netty-http/blob/master/src/java/me/shenfeng/http/HttpClientConfig.java)
-* [DNS prefetch](https://github.com/shenfeng/netty-http/blob/master/src/java/me/shenfeng/dns/DnsPrefecher.java),
+* [Configurable](https://github.com/shenfeng/async-http-client/blob/master/src/java/me/shenfeng/http/HttpClientConfig.java)
+* [DNS prefetch](https://github.com/shenfeng/async-http-client/blob/master/src/java/me/shenfeng/dns/DnsPrefecher.java),
 
 
 Limitations:
