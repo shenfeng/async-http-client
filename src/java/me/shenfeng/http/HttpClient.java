@@ -3,13 +3,25 @@ package me.shenfeng.http;
 import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static me.shenfeng.Utils.getPort;
+import static org.jboss.netty.buffer.ChannelBuffers.wrappedBuffer;
 import static org.jboss.netty.channel.Channels.pipeline;
+import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.ACCEPT;
+import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.ACCEPT_ENCODING;
+import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_LENGTH;
+import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.CONTENT_TYPE;
+import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.HOST;
+import static org.jboss.netty.handler.codec.http.HttpHeaders.Names.USER_AGENT;
+import static org.jboss.netty.handler.codec.http.HttpMethod.GET;
+import static org.jboss.netty.handler.codec.http.HttpMethod.POST;
+import static org.jboss.netty.handler.codec.http.HttpVersion.HTTP_1_1;
+import static org.jboss.netty.util.CharsetUtil.UTF_8;
 import static org.jboss.netty.util.ThreadNameDeterminer.CURRENT;
 import static org.jboss.netty.util.ThreadRenamingRunnable.setThreadNameDeterminer;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.net.Proxy.Type;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.Iterator;
@@ -21,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import javax.net.ssl.SSLEngine;
 
 import me.shenfeng.PrefixThreadFactory;
+import me.shenfeng.Utils;
 import me.shenfeng.ssl.SslContextFactory;
 
 import org.jboss.netty.bootstrap.ClientBootstrap;
@@ -29,7 +42,10 @@ import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
+import org.jboss.netty.handler.codec.http.DefaultHttpRequest;
 import org.jboss.netty.handler.codec.http.HttpChunkAggregator;
+import org.jboss.netty.handler.codec.http.HttpMethod;
+import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpRequestEncoder;
 import org.jboss.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
@@ -72,62 +88,44 @@ public class HttpClient implements HttpClientConstant {
 
     }
 
-    private void conf(ClientBootstrap bootstrap) {
-        bootstrap.setOption("connectTimeoutMillis",
-                mConf.connectionTimeOutInMs);
-        bootstrap.setOption("receiveBufferSize", mConf.receiveBuffer);
-        bootstrap.setOption("sendBufferSize", mConf.sendBuffer);
-        bootstrap.setOption("reuseAddress", true);
-    }
+    private HttpRequest buildRequest(HttpMethod method, URI uri,
+            Map<String, Object> headers, Map<String, Object> params,
+            Proxy proxy) {
 
-    public void close() {
-        mHttpBootstrap.releaseExternalResources();
-    }
+        String path = proxy.type() == Type.HTTP ? uri.toString() : Utils
+                .getPath(uri);
 
-    private void connect(InetSocketAddress addr, HttpResponseFuture futrue,
-            Map<String, Object> headers, Proxy proxy, boolean ssl) {
-        ClientBootstrap bootstrap = ssl ? mHttpsBootstrap : mHttpBootstrap;
-        ChannelFuture cf = bootstrap.connect(addr);
-        Channel ch = cf.getChannel();
-        futrue.setChannel(ch);
-        ch.getPipeline().getContext(Decoder.class).setAttachment(futrue);
-        cf.addListener(new ConnectionListener(mConf, futrue, headers, proxy));
-    }
+        HttpRequest request = new DefaultHttpRequest(HTTP_1_1, method, path);
 
-    public HttpResponseFuture execGet(final URI uri,
-            final Map<String, Object> headers) {
-        return execGet(uri, headers, Proxy.NO_PROXY);
-    }
+        request.setHeader(HOST, uri.getHost());
+        request.setHeader(USER_AGENT, mConf.userAgent);
+        request.setHeader(ACCEPT, "*/*");
+        request.setHeader(ACCEPT_ENCODING, "gzip, deflate");
 
-    public HttpResponseFuture execGet(final URI uri,
-            final Map<String, Object> headers, Proxy proxy) {
-
-        checkTimeoutIfNeeded();
-
-        final HttpResponseFuture resp = new HttpResponseFuture(
-                mConf.requestTimeoutInMs, uri);
-        switch (proxy.type()) {
-        case DIRECT:
-            try {
-                boolean ssl = "https".equals(uri.getScheme());
-                InetSocketAddress addr = new InetSocketAddress(
-                        InetAddress.getByName(uri.getHost()), getPort(uri));
-                connect(addr, resp, headers, proxy, ssl);
-            } catch (UnknownHostException e) {
-                resp.done(UNKOWN_HOST);
-            }
-            break;
-        case HTTP:
-        case SOCKS:
-            connect((InetSocketAddress) proxy.address(), resp, headers,
-                    proxy, false);
-            break;
-        default:
-            throw new RuntimeException(
-                    "Only http proxy is supported currently");
+        for (Map.Entry<String, Object> entry : headers.entrySet()) {
+            request.setHeader(entry.getKey(), entry.getValue());
         }
-        mFutures.add(resp);
-        return resp;
+
+        if (params != null) {
+            StringBuilder sb = new StringBuilder(32);
+            for (java.util.Map.Entry<String, Object> e : params.entrySet()) {
+                if (sb.length() > 0) {
+                    sb.append("&");
+                }
+                sb.append(e.getKey());
+                sb.append("=");
+                sb.append(e.getValue());
+            }
+
+            byte[] data = sb.toString().getBytes(UTF_8);
+            request.setHeader(CONTENT_TYPE,
+                    "application/x-www-form-urlencoded");
+            request.setHeader(CONTENT_LENGTH, data.length);
+            request.setContent(wrappedBuffer(data));
+        }
+
+        return request;
+
     }
 
     private void checkTimeoutIfNeeded() {
@@ -142,6 +140,63 @@ public class HttpClient implements HttpClientConstant {
             }
             mLastCheckTime = currentTimeMillis();
         }
+    }
+
+    public void close() {
+        mHttpBootstrap.releaseExternalResources();
+        mHttpsBootstrap.releaseExternalResources();
+    }
+
+    private void conf(ClientBootstrap bootstrap) {
+        bootstrap.setOption("connectTimeoutMillis",
+                mConf.connectionTimeOutInMs);
+        bootstrap.setOption("receiveBufferSize", mConf.receiveBuffer);
+        bootstrap.setOption("sendBufferSize", mConf.sendBuffer);
+        bootstrap.setOption("reuseAddress", true);
+    }
+
+    public HttpResponseFuture execGet(final URI uri,
+            final Map<String, Object> headers) {
+        return execGet(uri, headers, Proxy.NO_PROXY);
+    }
+
+    public HttpResponseFuture execGet(URI uri, Map<String, Object> headers,
+            Proxy proxy) {
+        HttpRequest request = buildRequest(GET, uri, headers, null, proxy);
+        return execRequest(request, uri, proxy);
+    }
+
+    public HttpResponseFuture execPost(URI uri, Map<String, Object> headers,
+            Map<String, Object> params, Proxy proxy) {
+        HttpRequest request = buildRequest(POST, uri, headers, params, proxy);
+        return execRequest(request, uri, proxy);
+    }
+
+    private HttpResponseFuture execRequest(HttpRequest request, URI uri,
+            Proxy proxy) {
+        checkTimeoutIfNeeded();
+        final HttpResponseFuture future = new HttpResponseFuture(
+                mConf.requestTimeoutInMs, request);
+        boolean ssl = "https".equals(uri.getScheme());
+
+        try {
+            InetSocketAddress addr = proxy.type() == Type.DIRECT ? new InetSocketAddress(
+                    InetAddress.getByName(uri.getHost()), getPort(uri))
+                    : (InetSocketAddress) proxy.address();
+
+            ClientBootstrap bootstrap = ssl ? mHttpsBootstrap
+                    : mHttpBootstrap;
+            ChannelFuture cf = bootstrap.connect(addr);
+            Channel ch = cf.getChannel();
+            future.setChannel(ch);
+            ch.getPipeline().getContext(Decoder.class).setAttachment(future);
+            cf.addListener(new ConnectionListener(future, uri,
+                    proxy.type() == Type.SOCKS));
+            mFutures.add(future);
+        } catch (UnknownHostException e) {
+            future.done(UNKOWN_HOST);
+        }
+        return future;
     }
 }
 

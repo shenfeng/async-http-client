@@ -19,7 +19,7 @@ public class ResponseHandler extends SimpleChannelUpstreamHandler {
         Throwable cause = e.getCause();
         HttpResponseFuture future = (HttpResponseFuture) ctx.getAttachment();
         if (future != null) {
-            logger.trace(future.uri.toString(), cause);
+            logger.trace(future.request.toString(), cause);
             future.abort(cause);
         } else {
             logger.trace(cause.getMessage(), cause);

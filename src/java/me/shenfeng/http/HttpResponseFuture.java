@@ -11,7 +11,6 @@ import static me.shenfeng.http.HttpClientConstant.UNKOWN_ERROR;
 
 import java.io.IOException;
 import java.net.ConnectException;
-import java.net.URI;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -20,6 +19,7 @@ import me.shenfeng.AbstractResponseFuture;
 
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.handler.codec.frame.TooLongFrameException;
+import org.jboss.netty.handler.codec.http.HttpRequest;
 import org.jboss.netty.handler.codec.http.HttpResponse;
 
 public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
@@ -28,11 +28,11 @@ public class HttpResponseFuture extends AbstractResponseFuture<HttpResponse> {
     private volatile Channel mChannel;
     private volatile long mTouchTime;
     private final int mTimeout;
-    final URI uri;// package private
+    final HttpRequest request; // package private
 
-    public HttpResponseFuture(int timeout, URI uri) {
+    public HttpResponseFuture(int timeout, HttpRequest request) {
         mTimeout = timeout;
-        this.uri = uri;
+        this.request = request;
         mTouchTime = currentTimeMillis();
     }
 
