@@ -18,11 +18,13 @@ import static org.jboss.netty.util.CharsetUtil.UTF_8;
 import static org.jboss.netty.util.ThreadNameDeterminer.CURRENT;
 import static org.jboss.netty.util.ThreadRenamingRunnable.setThreadNameDeterminer;
 
+import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Proxy.Type;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.Map;
@@ -112,9 +114,13 @@ public class HttpClient implements HttpClientConstant {
                 if (sb.length() > 0) {
                     sb.append("&");
                 }
-                sb.append(e.getKey());
-                sb.append("=");
-                sb.append(e.getValue());
+                try {
+                    sb.append(URLEncoder.encode(e.getKey(), "utf8"));
+                    sb.append("=");
+                    sb.append(URLEncoder.encode(e.getValue().toString(),
+                            "utf8"));
+                } catch (UnsupportedEncodingException ignore) {
+                }
             }
 
             byte[] data = sb.toString().getBytes(UTF_8);
@@ -164,6 +170,13 @@ public class HttpClient implements HttpClientConstant {
             Proxy proxy) {
         HttpRequest request = buildRequest(GET, uri, headers, null, proxy);
         return execRequest(request, uri, proxy);
+    }
+
+    public HttpResponseFuture execPost(URI uri, Map<String, Object> headers,
+            Map<String, Object> params) {
+        HttpRequest request = buildRequest(POST, uri, headers, params,
+                Proxy.NO_PROXY);
+        return execRequest(request, uri, Proxy.NO_PROXY);
     }
 
     public HttpResponseFuture execPost(URI uri, Map<String, Object> headers,

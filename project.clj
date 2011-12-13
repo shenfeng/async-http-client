@@ -7,6 +7,7 @@
                  "http://repository.jboss.org/nexus/content/groups/public/"}
   :dependencies [[org.jboss.netty/netty "3.2.7.Final"]]
   :dev-dependencies [[ring/ring-jetty-adapter "0.3.11"]
+                     [com.google.guava/guava "10.0.1"]
                      [ring/ring-core "0.3.11"]
                      [junit/junit "4.8.2"]
                      [ch.qos.logback/logback-classic "0.9.29"]])
