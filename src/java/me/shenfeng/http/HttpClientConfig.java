@@ -15,7 +15,7 @@ public class HttpClientConfig {
     protected int sendBuffer = 1024 * 32;
     protected int requestTimeoutInMs = 20000;
     protected int timerInterval = 1500;
-    protected String userAgent = "Mozilla/5.0 (compatible; Rssminer/1.0; +http://rssminer.net)";
+    protected String userAgent = "Async-java/1.0.0";
 
     protected String workerNamePrefix = "Http Worker";
     protected int workerThread = 1;
