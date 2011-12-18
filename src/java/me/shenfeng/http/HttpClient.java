@@ -24,11 +24,13 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Proxy.Type;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Queue;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 
@@ -56,6 +58,7 @@ import org.slf4j.LoggerFactory;
 public class HttpClient implements HttpClientConstant {
 
     static final Logger logger = LoggerFactory.getLogger(HttpClient.class);
+    static final Map<String, Object> EMPTY = new TreeMap<String, Object>();
 
     private final ClientBootstrap mHttpBootstrap;
     private final ClientBootstrap mHttpsBootstrap;
@@ -161,9 +164,12 @@ public class HttpClient implements HttpClientConstant {
         bootstrap.setOption("reuseAddress", true);
     }
 
-    public HttpResponseFuture execGet(final URI uri,
-            final Map<String, Object> headers) {
+    public HttpResponseFuture execGet(URI uri, Map<String, Object> headers) {
         return execGet(uri, headers, Proxy.NO_PROXY);
+    }
+
+    public HttpResponseFuture execGet(String uri) throws URISyntaxException {
+        return execGet(new URI(uri), EMPTY, Proxy.NO_PROXY);
     }
 
     public HttpResponseFuture execGet(URI uri, Map<String, Object> headers,
