@@ -194,6 +194,9 @@ public class HttpClient implements HttpClientConstant {
     private HttpResponseFuture execRequest(HttpRequest request, URI uri,
             Proxy proxy) {
         checkTimeoutIfNeeded();
+        if (proxy == null) {
+            proxy = Proxy.NO_PROXY;
+        }
         final HttpResponseFuture future = new HttpResponseFuture(
                 mConf.requestTimeoutInMs, request);
         boolean ssl = "https".equals(uri.getScheme());

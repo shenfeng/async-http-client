@@ -1,4 +1,4 @@
-(defproject me.shenfeng/async-http-client "1.0.1"
+(defproject me.shenfeng/async-http-client "1.0.2"
   :description "http client based on netty"
   :java-source-path "src/java"
   :javac-options {:debug "true" :fork "true"}
