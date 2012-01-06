@@ -108,7 +108,12 @@ public class HttpClient implements HttpClientConstant {
         request.setHeader(ACCEPT_ENCODING, "gzip, deflate");
 
         for (Map.Entry<String, Object> entry : headers.entrySet()) {
-            request.setHeader(entry.getKey(), entry.getValue());
+            Object v = entry.getValue();
+            if (v == null) {
+                request.removeHeader(entry.getKey());
+            } else {
+                request.setHeader(entry.getKey(), entry.getValue());
+            }
         }
 
         if (params != null) {
