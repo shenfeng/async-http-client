@@ -1,4 +1,5 @@
 pom.xml
+.idea/
 target/
 .classpath
 .project
